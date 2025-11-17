@@ -1,7 +1,17 @@
-html, body {
+html, body { height: 100%; margin: 0; }
+body {
   margin: 0;
   padding: 0;
+  overflow: hidden;
+  background: linear-gradient(#0b1226, #10213a);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
-canvas {
-  display: block;
+
+canvas { display: block; }
+.ui {
+  position: absolute; left: 8px; top: 8px; z-index: 10;
 }
+.title { font-weight: 700; font-size: 18px; margin-bottom: 6px; }
+.scores { font-size: 16px; }
+.help { position: absolute; right: 8px; top: 8px; font-size: 13px; opacity: 0.85; }
