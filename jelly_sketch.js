@@ -153,12 +153,23 @@ class Dwarf {
     this.shootCooldown = 0;
     this.groundBounce = 0.3;
     this.facing = 1; // 1 = right, -1 = left
+    this.stunned = false;
+    this.stunTimer = 0;
+    this.birdPhase = random(0, TWO_PI);
+    this.birdCount = 3;
   }
-
-  keyPressed(kc){ if (kc === this.controls.left) this.input.left = true; if (kc===this.controls.right) this.input.right=true; if (kc===this.controls.up) this.input.up=true; if (kc===this.controls.down) this.input.down=true; if (kc===this.controls.shoot) this.tryShoot(); }
+  keyPressed(kc){
+    if (this.stunned) return; // ignore inputs while stunned
+    if (kc === this.controls.left) this.input.left = true;
+    if (kc === this.controls.right) this.input.right = true;
+    if (kc === this.controls.up) this.input.up = true;
+    if (kc === this.controls.down) this.input.down = true;
+    if (kc === this.controls.shoot) this.tryShoot();
+  }
   keyReleased(kc){ if (kc === this.controls.left) this.input.left = false; if (kc===this.controls.right) this.input.right=false; if (kc===this.controls.up) this.input.up=false; if (kc===this.controls.down) this.input.down=false; }
 
     tryShoot(){ if (this.shootCooldown<=0){ // shoot a weapon primarily in the facing horizontal direction
+      if (this.stunned) return; // cannot shoot while stunned
       let ang = this.facing === -1 ? 180 : 0;
       // small random spread
       ang += random(-10,10);
@@ -166,15 +177,24 @@ class Dwarf {
       this.shootCooldown = 18; }
     }
 
+  stun(frames){ this.stunTimer = max(this.stunTimer, frames); this.stunned = true; }
+
   update(game){
     // cooldown
     if (this.shootCooldown>0) this.shootCooldown--;
+    // handle stun timer
+    if (this.stunTimer > 0) { this.stunTimer--; this.stunned = true; } else { this.stunned = false; }
     // controls produce force; dwarfs dig by pushing against cave nodes
     let thrust = createVector(0,0);
+    if (!this.stunned) {
       if (this.input.left) { thrust.x -= 0.9; this.facing = -1; }
       if (this.input.right) { thrust.x += 0.9; this.facing = 1; }
-    if (this.input.up) thrust.y -= 1.1;
-    if (this.input.down) thrust.y += 0.45;
+      if (this.input.up) thrust.y -= 1.1;
+      if (this.input.down) thrust.y += 0.45;
+    } else {
+      // while stunned slow down gradually
+      this.vel.mult(0.92);
+    }
 
     // gravity
     thrust.y += game.gravity * this.mass;
@@ -247,6 +267,20 @@ class Dwarf {
     // simple pick indicator when pressing dig (down)
     if (this.input.down) { stroke(255,200,100); strokeWeight(3); line(0,6,0,12); noStroke(); }
     pop();
+
+    // stunned cartoon birds above head
+    if (this.stunned) {
+      for (let i = 0; i < this.birdCount; i++) {
+        let t = frameCount * 6 + this.birdPhase * (i+1) * 10;
+        let bx = this.pos.x + cos(t + i*90) * (this.radius * 0.9);
+        let by = this.pos.y - this.radius * 1.8 + sin(t * 0.9 + i) * 8;
+        push(); translate(bx, by); rotate(sin(t*0.05 + i) * 0.4);
+        noFill(); stroke(255,220,120); strokeWeight(2);
+        // small curved line representing a cartoon bird
+        arc(0, 0, 14, 10, 200, 340);
+        pop();
+      }
+    }
   }
 
   canCollect(gem, cave){
@@ -298,13 +332,20 @@ class Weapon {
     }
 
     // collide with dwarfs (other than owner): simple hit and bounce
-    for (let d of game.dwarfs){ if (d.id === this.owner) continue; let dd = dist(this.pos.x,this.pos.y,d.pos.x,d.pos.y); if (dd < this.r + d.radius*0.8){ // hit
+    for (let d of game.dwarfs){
+      if (d.id === this.owner) continue;
+      let dd = dist(this.pos.x,this.pos.y,d.pos.x,d.pos.y);
+      if (dd < this.r + d.radius*0.8){ // hit
         // knock dwarf slightly
         let impulse = p5.Vector.sub(d.pos, this.pos).normalize().mult(3);
         d.vel.add(impulse);
+        // stun the hit dwarf briefly and show particles
+        d.stun(90); // frames
         this.isDead = true;
         game.particles.push(new ParticleEffect(this.pos.x, this.pos.y, color(255,80,60), 18));
-        break; } }
+        break;
+      }
+    }
   }
   draw(){ push(); translate(this.pos.x,this.pos.y); fill(255,220,100); ellipse(0,0,this.r*2,this.r*2); fill(220,180,60); ellipse(-3,-3,this.r*1.1,this.r*1.1); pop(); }
 }
