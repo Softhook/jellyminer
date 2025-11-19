@@ -269,20 +269,33 @@ class Weapon {
     this.pos.add(this.vel);
     this.life--; if (this.life<=0) this.isDead=true;
 
-    // collide with cave nodes: reflect velocity and reduce node slightly (weapons carve slowly)
+    // collide with cave nodes: reflect velocity and reduce node (damage scales with impact speed)
     let nodes = game.cave.nodesInRange(this.pos.x, this.pos.y, this.r + game.cave.nodeRadius*1.2);
-    for (let n of nodes){ let toNode = p5.Vector.sub(this.pos, n.pos); let d = toNode.mag(); if (d <= 0.001) continue; let overlap = (this.r + n.r) - d; if (overlap > 0){ let normal = toNode.copy().normalize(); // reflect velocity
+    for (let n of nodes){
+      let toNode = p5.Vector.sub(this.pos, n.pos);
+      let d = toNode.mag();
+      if (d <= 0.001) continue;
+      let overlap = (this.r + n.r) - d;
+      if (overlap > 0){
+        let normal = toNode.copy().normalize();
+        // reflect velocity
         let vn = this.vel.dot(normal);
         if (vn < 0) { // only reflect if moving into node
           this.vel.sub(p5.Vector.mult(normal, 1.9 * vn));
           this.vel.mult(0.94);
           this.bounces--; if (this.bounces<=0) this.isDead=true;
         }
-        // carve
-        game.cave.dig(n, 0.6);
-        // small spark
-        game.particles.push(new ParticleEffect(this.pos.x + random(-4,4), this.pos.y + random(-4,4), color(255,200,100), random(4,8)));
-      } }
+        // stronger carve: scale with impact speed
+        let speedFactor = constrain(this.vel.mag() / 8, 0.5, 3.0);
+        let damage = 1.6 * speedFactor; // base increased damage
+        game.cave.dig(n, damage);
+        // also damage nearby nodes lightly for splash carving
+        let neighbors = game.cave.nodesInRange(n.pos.x, n.pos.y, n.r + 18);
+        for (let nn of neighbors){ if (nn !== n) game.cave.dig(nn, damage * 0.35); }
+        // enhanced spark
+        game.particles.push(new ParticleEffect(this.pos.x + random(-6,6), this.pos.y + random(-6,6), color(255,200,100), random(6,12)));
+      }
+    }
 
     // collide with dwarfs (other than owner): simple hit and bounce
     for (let d of game.dwarfs){ if (d.id === this.owner) continue; let dd = dist(this.pos.x,this.pos.y,d.pos.x,d.pos.y); if (dd < this.r + d.radius*0.8){ // hit
