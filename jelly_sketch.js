@@ -22,6 +22,16 @@ function windowResized() { resizeCanvas(windowWidth, windowHeight); game.onResiz
 function keyPressed() { game.onKeyPressed(keyCode); }
 function keyReleased() { game.onKeyReleased(keyCode); }
 
+// Enter fullscreen on any mouse press or touch (user gesture required by browsers)
+function mousePressed() {
+  if (!fullscreen()) {
+    fullscreen(true);
+    // small delay then resize canvas to new size
+    setTimeout(() => { resizeCanvas(windowWidth, windowHeight); if (game && game.onResize) game.onResize(); }, 250);
+  }
+}
+function touchStarted() { mousePressed(); }
+
 // ------------------ Game class ------------------
 class Game {
   constructor() {
@@ -163,18 +173,31 @@ class Dwarf {
     if (kc === this.controls.left) this.input.left = true;
     if (kc === this.controls.right) this.input.right = true;
     if (kc === this.controls.up) this.input.up = true;
-    if (kc === this.controls.down) this.input.down = true;
+    if (kc === this.controls.down) {
+      this.input.down = true;
+      // pressing down also shoots a weapon downward
+      this.shootDown();
+    }
     if (kc === this.controls.shoot) this.tryShoot();
   }
   keyReleased(kc){ if (kc === this.controls.left) this.input.left = false; if (kc===this.controls.right) this.input.right=false; if (kc===this.controls.up) this.input.up=false; if (kc===this.controls.down) this.input.down=false; }
 
     tryShoot(){ if (this.shootCooldown<=0){ // shoot a weapon primarily in the facing horizontal direction
-      if (this.stunned) return; // cannot shoot while stunned
-      let ang = this.facing === -1 ? 180 : 0;
+        if (this.stunned) return; // cannot shoot while stunned
+        let ang = this.facing === -1 ? 180 : 0;
       // small random spread
       ang += random(-10,10);
       game.spawnWeapon(this.pos.x + cos(ang)*this.radius*1.2, this.pos.y + sin(ang)*this.radius*1.2, ang, this.id);
       this.shootCooldown = 18; }
+    }
+
+    shootDown(){
+      if (this.stunned) return;
+      if (this.shootCooldown>0) return;
+      let ang = 90; // downwards
+      ang += random(-6,6);
+      game.spawnWeapon(this.pos.x + cos(ang)*this.radius*1.2, this.pos.y + sin(ang)*this.radius*1.2, ang, this.id);
+      this.shootCooldown = 18;
     }
 
   stun(frames){ this.stunTimer = max(this.stunTimer, frames); this.stunned = true; }
@@ -339,8 +362,8 @@ class Weapon {
         // knock dwarf slightly
         let impulse = p5.Vector.sub(d.pos, this.pos).normalize().mult(3);
         d.vel.add(impulse);
-        // stun the hit dwarf briefly and show particles
-        d.stun(90); // frames
+        // stun the hit dwarf for longer and show particles
+        d.stun(360); // frames (4x longer)
         this.isDead = true;
         game.particles.push(new ParticleEffect(this.pos.x, this.pos.y, color(255,80,60), 18));
         break;
